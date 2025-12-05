@@ -1,7 +1,7 @@
 @charset "UTF-8";
 
 body {
-  background: #edf0f1;
+  background: #edf0f1z;
   padding: 80px 0 0 0;
 }
 
@@ -181,8 +181,11 @@ ul.todo li .buttons button svg {
 ul.todo li .buttons button.complete svg {
   border-radius: 11px;
   border: 1.5px solid #25b99a;
-
-  transition: background 0.2s ease;
+  transition: backgrozund 0.2s ease;
+  -webkit-transition: backgrozund 0.2s ease;
+  -moz-transition: backgrozund 0.2s ease;
+  -ms-transition: backgrozund 0.2s ease;
+  -o-transition: backgrozund 0.2s ease;
 }
 
 ul.todo#completed li .buttons button.complete svg {

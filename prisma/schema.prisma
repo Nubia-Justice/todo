@@ -1,0 +1,89 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Family {
+  id          String   @id @default(cuid()) // familyId
+  name        String   // familyName
+  createdBy   String   // userId of creator
+  createdAt   DateTime @default(now())
+  
+  users       User[]
+  templates   ChoreTemplate[]
+}
+
+model User {
+  id          String   @id @default(cuid()) // userId
+  email       String   @unique // Added for auth
+  password    String   // Added for auth
+  familyId    String?
+  role        String   // parent/child
+  name        String
+  avatar      String?
+  points      Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  family      Family?  @relation(fields: [familyId], references: [id])
+  assignments ChoreAssignment[]
+  completions ChoreCompletionLog[] @relation("SubmittedBy")
+  approvals   ChoreCompletionLog[] @relation("ApprovedBy")
+}
+
+model ChoreTemplate {
+  id          String   @id @default(cuid()) // templateId
+  familyId    String
+  title       String
+  description String?
+  category    String?
+  difficulty  String?
+  basePoints  Int
+  frequency   String   // daily/weekly/custom/one-time
+
+  family      Family   @relation(fields: [familyId], references: [id])
+  assignments ChoreAssignment[]
+}
+
+model ChoreAssignment {
+  id              String   @id @default(cuid()) // assignmentId
+  templateId      String
+  assignedToId    String   // assignedTo
+  dueDate         DateTime?
+  reminderTime    DateTime?
+  status          String   @default("Pending") // Pending, Completed, Approved, Rejected
+  approvalRequired Boolean @default(true)
+  
+  template        ChoreTemplate @relation(fields: [templateId], references: [id])
+  assignedTo      User          @relation(fields: [assignedToId], references: [id])
+  completions     ChoreCompletionLog[]
+}
+
+model ChoreCompletionLog {
+  id           String   @id @default(cuid()) // completionId
+  assignmentId String
+  submittedById String
+  photoUrl     String?
+  timestamp    DateTime @default(now())
+  approvedById String?
+  approvedAt   DateTime?
+
+  assignment   ChoreAssignment @relation(fields: [assignmentId], references: [id])
+  submittedBy  User            @relation("SubmittedBy", fields: [submittedById], references: [id])
+  approvedBy   User?           @relation("ApprovedBy", fields: [approvedById], references: [id])
+}
+
+model Reward {
+  id            String   @id @default(cuid()) // rewardId
+  familyId      String   // Added to link to family
+  title         String
+  pointsRequired Int
+  isActive      Boolean  @default(true)
+  redeemedCount Int      @default(0)
+}
