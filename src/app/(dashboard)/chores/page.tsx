@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, CheckCircle2, Clock, XCircle } from "lucide-react"
+import { Plus, CheckCircle2, Clock, XCircle, User } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 type Chore = {
     id: string
@@ -21,8 +22,7 @@ export default function ChoresPage() {
     const [chores, setChores] = useState<Chore[]>([])
     const [loading, setLoading] = useState(true)
     const [showAssignModal, setShowAssignModal] = useState(false)
-    // In a real app, we'd fetch family members to populate the assign dropdown
-    // For MVP, we might need another API endpoint for that or pass it down
+    const router = useRouter()
 
     useEffect(() => {
         fetchChores()
@@ -39,6 +39,21 @@ export default function ChoresPage() {
             console.error("Failed to fetch chores", error)
         } finally {
             setLoading(false)
+        }
+    }
+
+    async function handleMarkDone(id: string) {
+        // In a real app, we'd probably upload a photo here first
+        try {
+            const res = await fetch(`/api/chores/${id}/complete`, {
+                method: 'POST'
+            })
+            if (res.ok) {
+                fetchChores()
+                router.refresh()
+            }
+        } catch (error) {
+            console.error("Failed to mark done", error)
         }
     }
 
@@ -70,8 +85,12 @@ export default function ChoresPage() {
                                     Due: {chore.dueDate ? new Date(chore.dueDate).toLocaleDateString() : 'No date'}
                                 </p>
                                 <div className="flex items-center gap-2 mb-4">
-                                    <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs">
-                                        {chore.assignedTo?.name?.[0] || '?'}
+                                    <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs overflow-hidden">
+                                        {chore.assignedTo?.avatar ? (
+                                            <img src={chore.assignedTo.avatar} alt={chore.assignedTo.name} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <span>{chore.assignedTo?.name?.[0] || '?'}</span>
+                                        )}
                                     </div>
                                     <span className="text-sm text-gray-600">{chore.assignedTo?.name}</span>
                                 </div>
@@ -86,7 +105,10 @@ export default function ChoresPage() {
                                 </span>
 
                                 {chore.status === 'Pending' && (
-                                    <button className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
+                                    <button
+                                        onClick={() => handleMarkDone(chore.id)}
+                                        className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                                    >
                                         Mark Done
                                     </button>
                                 )}
@@ -96,7 +118,86 @@ export default function ChoresPage() {
                 </div>
             )}
 
-            {/* Assign Modal would go here - skipping for brevity in this step */}
+            {showAssignModal && (
+                <AssignChoreModal onClose={() => setShowAssignModal(false)} onSuccess={() => {
+                    setShowAssignModal(false)
+                    fetchChores()
+                }} />
+            )}
+        </div>
+    )
+}
+
+function AssignChoreModal({ onClose, onSuccess }: { onClose: () => void, onSuccess: () => void }) {
+    const [loading, setLoading] = useState(false)
+    // Mock users for now, ideally fetch from API
+    const [users, setUsers] = useState<{ id: string, name: string }[]>([])
+
+    useEffect(() => {
+        // Fetch family members
+        fetch('/api/family/members').then(res => res.json()).then(setUsers).catch(console.error)
+    }, [])
+
+    async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+        e.preventDefault()
+        setLoading(true)
+        const formData = new FormData(e.currentTarget)
+        const data = {
+            title: formData.get('title'),
+            description: formData.get('description'),
+            basePoints: Number(formData.get('points')),
+            assignedToId: formData.get('assignedTo'),
+            dueDate: formData.get('dueDate'),
+        }
+
+        try {
+            const res = await fetch('/api/chores', {
+                method: 'POST',
+                body: JSON.stringify(data),
+            })
+            if (res.ok) {
+                onSuccess()
+            }
+        } catch (error) {
+            console.error(error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                <h2 className="text-xl font-bold mb-4">Assign New Chore</h2>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">Title</label>
+                        <input name="title" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">Points</label>
+                        <input name="points" type="number" required defaultValue={10} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">Assign To</label>
+                        <select name="assignedTo" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2">
+                            {users.map(u => (
+                                <option key={u.id} value={u.id}>{u.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">Due Date</label>
+                        <input name="dueDate" type="date" className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2" />
+                    </div>
+                    <div className="flex justify-end gap-2 mt-6">
+                        <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md">Cancel</button>
+                        <button type="submit" disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50">
+                            {loading ? 'Assigning...' : 'Assign'}
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     )
 }

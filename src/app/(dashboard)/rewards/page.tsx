@@ -31,6 +31,24 @@ export default function RewardsPage() {
         }
     }
 
+    async function handleRedeem(id: string) {
+        if (!confirm("Are you sure you want to redeem this reward?")) return
+
+        try {
+            const res = await fetch(`/api/rewards/${id}/redeem`, {
+                method: 'POST'
+            })
+            if (res.ok) {
+                alert("Reward redeemed! Waiting for parent approval.")
+            } else {
+                const err = await res.text()
+                alert("Failed to redeem: " + err)
+            }
+        } catch (error) {
+            console.error("Failed to redeem", error)
+        }
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -57,7 +75,10 @@ export default function RewardsPage() {
                                 <Coins className="w-4 h-4" />
                                 <span>{reward.pointsRequired} pts</span>
                             </div>
-                            <button className="w-full py-2 px-4 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors">
+                            <button
+                                onClick={() => handleRedeem(reward.id)}
+                                className="w-full py-2 px-4 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors"
+                            >
                                 Redeem
                             </button>
                         </div>
