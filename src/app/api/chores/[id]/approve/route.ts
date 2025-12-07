@@ -8,8 +8,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const session = await auth()
     if (!session?.user) return new NextResponse("Unauthorized", { status: 401 })
 
+    interface UserWithRole {
+        id: string
+        role: string
+        familyId: string
+    }
+
     // Session user type is extended at runtime
-    const { role, id: userId } = session.user as any
+    const { role, id: userId } = session.user as unknown as UserWithRole
 
     if (role !== 'parent') {
         return new NextResponse("Only parents can approve chores", { status: 403 })

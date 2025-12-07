@@ -2,6 +2,7 @@ import { auth } from "@/auth"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { Home, Calendar, CheckSquare, Gift, Settings, LogOut, User } from "lucide-react"
+import Image from "next/image"
 
 export default async function DashboardLayout({
     children,
@@ -44,8 +45,10 @@ export default async function DashboardLayout({
                 <aside className="hidden lg:flex flex-col w-64 bg-white border-r min-h-screen fixed">
                     <div className="p-6 border-b">
                         <h1 className="text-2xl font-bold text-indigo-600">HouseChores</h1>
+
+
                         <p className="text-sm text-gray-500 mt-1">
-                            {/* @ts-ignore */}
+                            {/* @ts-expect-error -- Session user type is extended at runtime */}
                             {session.user.role === 'parent' ? 'Parent View' : 'Child View'}
                         </p>
                     </div>
@@ -66,7 +69,7 @@ export default async function DashboardLayout({
                     <div className="p-4 border-t">
                         <div className="flex items-center gap-3 mb-4 px-4">
                             {session.user.image ? (
-                                <img src={session.user.image} alt="Avatar" className="w-10 h-10 rounded-full" />
+                                <Image src={session.user.image} alt="Avatar" width={40} height={40} className="rounded-full" />
                             ) : (
                                 <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
                                     <User size={20} />

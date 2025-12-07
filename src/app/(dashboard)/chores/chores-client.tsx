@@ -19,7 +19,7 @@ type Chore = {
         avatar: string | null
     }
     assignedToId: string
-    dueDate: string | null
+    dueDate: string | Date | null
     status: string
 }
 

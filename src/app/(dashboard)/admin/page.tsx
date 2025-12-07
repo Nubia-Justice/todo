@@ -13,7 +13,6 @@ type User = {
 
 export default function AdminPage() {
     const [users, setUsers] = useState<User[]>([])
-    const [loading, setLoading] = useState(true)
 
     useEffect(() => {
         fetchMembers()
@@ -28,8 +27,6 @@ export default function AdminPage() {
             }
         } catch (error) {
             console.error("Failed to fetch members", error)
-        } finally {
-            setLoading(false)
         }
     }
 

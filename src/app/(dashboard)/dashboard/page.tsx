@@ -119,7 +119,7 @@ export default async function DashboardPage() {
                 <h1 className="text-2xl font-bold text-gray-900">
                     Welcome back, {session.user.name?.split(' ')[0]}!
                 </h1>
-                <p className="text-gray-500">Here's what's happening today.</p>
+                <p className="text-gray-500">Here&apos;s what&apos;s happening today.</p>
             </header>
 
             {data.role === 'child' ? (
