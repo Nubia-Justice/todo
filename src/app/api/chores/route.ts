@@ -14,38 +14,35 @@ const createChoreSchema = z.object({
     dueDate: z.string().optional(), // ISO string
 })
 
-export async function GET(req: Request) {
+export async function GET() {
     const session = await auth()
     if (!session?.user) return new NextResponse("Unauthorized", { status: 401 })
 
-    // @ts-ignore
-    const { role, familyId, id } = session.user
+    // @ts-expect-error -- Session user type is extended at runtime
+    const { role, familyId, id: userId } = session.user
 
     if (!familyId) return new NextResponse("No family found", { status: 400 })
 
     try {
-        if (role === 'parent') {
-            // Parents see all chores in the family
-            const chores = await prisma.choreAssignment.findMany({
-                where: { template: { familyId } },
-                include: {
-                    template: true,
-                    assignedTo: { select: { name: true, avatar: true } }
+        let chores
+        if (role === 'child') {
+            chores = await prisma.choreAssignment.findMany({
+                where: {
+                    assignedToId: userId,
+                    status: { in: ["Pending", "Completed"] }
                 },
-                orderBy: { dueDate: 'asc' }
-            })
-            return NextResponse.json(chores)
-        } else {
-            // Children see only their chores
-            const chores = await prisma.choreAssignment.findMany({
-                where: { assignedToId: id },
                 include: { template: true },
                 orderBy: { dueDate: 'asc' }
             })
-            return NextResponse.json(chores)
+        } else {
+            chores = await prisma.choreAssignment.findMany({
+                where: { template: { familyId } },
+                include: { template: true, assignedTo: true },
+                orderBy: { dueDate: 'asc' }
+            })
         }
-    } catch (error) {
-        console.error("Failed to fetch chores:", error)
+        return NextResponse.json(chores)
+    } catch {
         return new NextResponse("Internal Server Error", { status: 500 })
     }
 }
@@ -54,7 +51,7 @@ export async function POST(req: Request) {
     const session = await auth()
     if (!session?.user) return new NextResponse("Unauthorized", { status: 401 })
 
-    // @ts-ignore
+    // @ts-expect-error -- Session user type is extended at runtime
     const { role, familyId } = session.user
 
     if (role !== 'parent') {

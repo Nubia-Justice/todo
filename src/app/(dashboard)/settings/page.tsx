@@ -4,6 +4,9 @@ export default async function SettingsPage() {
     const session = await auth()
     if (!session?.user) return null
 
+    // @ts-expect-error -- Session user type is extended at runtime
+    const { role, familyId } = session.user
+
     return (
         <div className="max-w-2xl space-y-6">
             <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
@@ -18,8 +21,7 @@ export default async function SettingsPage() {
                         <div className="font-medium text-lg">{session.user.name}</div>
                         <div className="text-gray-500">{session.user.email}</div>
                         <div className="text-sm text-indigo-600 mt-1 capitalize">
-                            {/* @ts-ignore */}
-                            {session.user.role} Account
+                            {role} Account
                         </div>
                     </div>
                 </div>
@@ -43,8 +45,10 @@ export default async function SettingsPage() {
                 </p>
                 <div className="p-4 bg-gray-50 rounded-md border">
                     <div className="text-sm font-medium text-gray-700">Family Invite Code</div>
-                    {/* @ts-ignore */}
-                    <div className="text-lg font-mono font-bold text-indigo-600 mt-1">{session.user.familyId}</div>
+                    {/* @ts-expect-error -- Family ID is available */}
+                    <p className="text-3xl font-mono font-bold tracking-wider text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg inline-block border-2 border-indigo-100 border-dashed">
+                        {familyId}
+                    </p>
                     <div className="text-xs text-gray-500 mt-1">Share this code with your children to let them join.</div>
                 </div>
             </div>

@@ -8,7 +8,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const session = await auth()
     if (!session?.user) return new NextResponse("Unauthorized", { status: 401 })
 
-    // @ts-ignore
+    // @ts-expect-error -- Session user type is extended at runtime
     const { id: userId } = session.user
     // In Next.js App Router, params are awaited in the component but passed as object in route handlers? 
     // Actually for route handlers in 15+ it might be different but for 14 it's standard.

@@ -4,12 +4,12 @@ import { PrismaClient } from "@prisma/client"
 
 const prisma = new PrismaClient()
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST({ params }: { params: { id: string } }) {
     const session = await auth()
     if (!session?.user) return new NextResponse("Unauthorized", { status: 401 })
 
-    // @ts-ignore
-    const { id: userId, points } = session.user
+    // @ts-expect-error -- Session user type is extended at runtime
+    const { id: userId } = session.user
     const rewardId = params.id
 
     try {

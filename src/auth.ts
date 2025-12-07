@@ -47,13 +47,22 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
                 // Fetch role from DB to add to session
                 const user = await prisma.user.findUnique({ where: { id: token.sub } })
                 if (user) {
-                    // @ts-ignore
+                    // @ts-expect-error -- Extending session user type
                     session.user.role = user.role
-                    // @ts-ignore
+                    // @ts-expect-error -- Extending session user type
                     session.user.familyId = user.familyId
                 }
             }
             return session
+        },
+        authorized({ auth, request: { nextUrl } }) {
+            const isLoggedIn = !!auth?.user;
+            const isOnDashboard = nextUrl.pathname.startsWith('/dashboard');
+            if (isOnDashboard) {
+                if (isLoggedIn) return true;
+                return false; // Redirect unauthenticated users to login page
+            }
+            return true;
         },
     },
     pages: {

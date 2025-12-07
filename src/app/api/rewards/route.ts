@@ -10,11 +10,11 @@ const createRewardSchema = z.object({
     pointsRequired: z.coerce.number().min(1),
 })
 
-export async function GET(req: Request) {
+export async function GET() {
     const session = await auth()
     if (!session?.user) return new NextResponse("Unauthorized", { status: 401 })
 
-    // @ts-ignore
+    // @ts-expect-error -- Session user type is extended at runtime
     const { familyId } = session.user
     if (!familyId) return new NextResponse("No family found", { status: 400 })
 
@@ -24,7 +24,7 @@ export async function GET(req: Request) {
             orderBy: { pointsRequired: 'asc' }
         })
         return NextResponse.json(rewards)
-    } catch (error) {
+    } catch {
         return new NextResponse("Internal Server Error", { status: 500 })
     }
 }
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     const session = await auth()
     if (!session?.user) return new NextResponse("Unauthorized", { status: 401 })
 
-    // @ts-ignore
+    // @ts-expect-error -- Session user type is extended at runtime
     const { role, familyId } = session.user
 
     if (role !== 'parent') {
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
         })
 
         return NextResponse.json(reward)
-    } catch (error) {
+    } catch {
         return new NextResponse("Internal Server Error", { status: 500 })
     }
 }

@@ -1,10 +1,32 @@
 import { auth } from "@/auth"
 import { PrismaClient } from "@prisma/client"
 import { CheckCircle2, Clock, Star, Trophy } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { UserAvatar } from "@/components/features/user-avatar"
+import { Badge } from "@/components/ui/badge"
+import { format } from "date-fns"
 
 const prisma = new PrismaClient()
 
-async function getData(userId: string, role: string, familyId: string) {
+type DashboardData = {
+    role: 'parent'
+    family: {
+        users: { id: string; name: string; points: number; avatar: string | null }[]
+    }
+    pendingChores: number
+    completedChores: number
+} | {
+    role: 'child'
+    myChores: {
+        id: string
+        status: string
+        dueDate: Date | null
+        template: { title: string; basePoints: number }
+    }[]
+    points: number
+}
+
+async function getData(userId: string, role: string, familyId: string): Promise<DashboardData> {
     if (role === 'parent') {
         // Parent Data: Family overview
         const family = await prisma.family.findUnique({
@@ -22,20 +44,32 @@ async function getData(userId: string, role: string, familyId: string) {
             }
         })
 
-        const completedChores = await prisma.choreAssignment.count({
+        const completedChoresCount = await prisma.choreAssignment.count({
             where: {
                 template: { familyId },
                 status: "Completed" // Waiting for approval
             }
         })
 
-        return { family, pendingChores, completedChores }
+        // Fetch actual completed chores for approval list
+        const choresToApprove = await prisma.choreAssignment.findMany({
+            where: {
+                template: { familyId },
+                status: "Completed"
+            },
+            include: {
+                template: true,
+                assignedTo: true
+            }
+        })
+
+        return { family, pendingChores, completedChoresCount, choresToApprove }
     } else {
         // Child Data: Personal overview
         const myChores = await prisma.choreAssignment.findMany({
             where: {
                 assignedToId: userId,
-                status: { in: ["Pending", "Completed"] }
+                status: { in: ["Pending", "Completed", "Approved"] } // Show approved recently too? Maybe just pending/completed for now
             },
             include: { template: true },
             orderBy: { dueDate: 'asc' }
@@ -53,14 +87,14 @@ export default async function DashboardPage() {
     const session = await auth()
     if (!session?.user) return null
 
-    // @ts-ignore
+    // @ts-expect-error -- Session user type is extended at runtime
     const { role, familyId, id } = session.user
 
     if (!familyId) {
         return <div className="p-4">You are not part of a family yet.</div>
     }
 
-    const data = await getData(id, role, familyId)
+    const data = await getData(id as string, role as string, familyId as string)
 
     return (
         <div className="space-y-6">
@@ -109,12 +143,7 @@ export default async function DashboardPage() {
                                             <h3 className="font-medium text-gray-900">{chore.template.title}</h3>
                                             <p className="text-sm text-gray-500">{chore.template.basePoints} pts • Due {chore.dueDate ? new Date(chore.dueDate).toLocaleDateString() : 'No date'}</p>
                                         </div>
-                                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${chore.status === 'Completed'
-                                                ? 'bg-yellow-100 text-yellow-800'
-                                                : 'bg-gray-100 text-gray-800'
-                                            }`}>
-                                            {chore.status === 'Completed' ? 'Waiting Approval' : 'To Do'}
-                                        </span>
+                                        <CompleteChoreButton choreId={chore.id} status={chore.status} />
                                     </div>
                                 ))
                             )}
@@ -131,7 +160,7 @@ export default async function DashboardPage() {
                                 <span className="font-semibold">Pending Approval</span>
                             </div>
                             {/* @ts-ignore */}
-                            <div className="text-3xl font-bold text-gray-900">{data.completedChores}</div>
+                            <div className="text-3xl font-bold text-gray-900">{data.completedChoresCount}</div>
                         </div>
                         <div className="bg-white rounded-xl p-6 shadow-sm border">
                             <div className="flex items-center gap-3 mb-2 text-indigo-600">
@@ -151,12 +180,46 @@ export default async function DashboardPage() {
                         </div>
                     </div>
 
+                    {/* Pending Approvals Section */}
+                    {/* @ts-ignore */}
+                    {data.choresToApprove.length > 0 && (
+                        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                            <div className="p-4 border-b bg-yellow-50 flex justify-between items-center">
+                                <h2 className="font-semibold text-yellow-900 flex items-center gap-2">
+                                    <Clock className="w-5 h-5" />
+                                    Waiting for Approval
+                                </h2>
+                            </div>
+                            <div className="divide-y">
+                                {/* @ts-ignore */}
+                                {data.choresToApprove.map((chore) => (
+                                    <div key={chore.id} className="p-4 flex items-center justify-between hover:bg-gray-50">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs">
+                                                {chore.assignedTo.name[0]}
+                                            </div>
+                                            <div>
+                                                <h3 className="font-medium text-gray-900">{chore.template.title}</h3>
+                                                <p className="text-sm text-gray-500">
+                                                    Completed by {chore.assignedTo.name} • {chore.template.basePoints} pts
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <ApproveChoreButton choreId={chore.id} />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="bg-white rounded-xl shadow-sm border">
                         <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
                             <h2 className="font-semibold text-gray-900">Family Members</h2>
                         </div>
                         <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {/* @ts-ignore */}
+                            {/* @ts-expect-error -- Data structure includes users */}
                             {data.family.users.map(user => (
                                 <div key={user.id} className="flex items-center gap-4 p-3 border rounded-lg">
                                     <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
