@@ -1,49 +1,44 @@
 "use client"
 
 import { useState } from "react"
+import { Button } from "../ui/button"
+import { Check } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { Check, Loader2, X } from "lucide-react"
 
 interface ApproveChoreButtonProps {
     choreId: string
 }
 
 export function ApproveChoreButton({ choreId }: ApproveChoreButtonProps) {
-    const [isLoading, setIsLoading] = useState(false)
+    const [loading, setLoading] = useState(false)
     const router = useRouter()
 
-    const handleApprove = async () => {
-        setIsLoading(true)
+    async function handleApprove() {
+        setLoading(true)
         try {
             const res = await fetch(`/api/chores/${choreId}/approve`, {
-                method: "POST",
+                method: 'POST'
             })
-
-            if (!res.ok) {
-                throw new Error("Failed to approve chore")
+            if (res.ok) {
+                router.refresh()
             }
-
-            router.refresh()
         } catch (error) {
-            console.error(error)
-            alert("Failed to approve chore")
+            console.error("Failed to approve", error)
         } finally {
-            setIsLoading(false)
+            setLoading(false)
         }
     }
 
     return (
-        <button
+        <Button
+            size="sm"
+            variant="success"
             onClick={handleApprove}
-            disabled={isLoading}
-            className="p-1 rounded-full text-green-600 hover:bg-green-50 disabled:opacity-50"
-            title="Approve"
+            disabled={loading}
+            className="gap-1"
         >
-            {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-                <Check className="w-5 h-5" />
-            )}
-        </button>
+            <Check className="w-4 h-4" />
+            {loading ? "..." : "Approve"}
+        </Button>
     )
 }

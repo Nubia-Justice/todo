@@ -22,7 +22,7 @@ interface ChoreCardProps {
         status: string
     }
     onMarkDone?: (id: string) => void
-    onEdit?: (chore: any) => void
+    onEdit?: (chore: ChoreCardProps['chore']) => void
     onDelete?: (id: string) => void
     showAssignee?: boolean
 }
@@ -40,8 +40,8 @@ export function ChoreCard({ chore, onMarkDone, onEdit, onDelete, showAssignee = 
                         {onEdit && (
                             <Button
                                 variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-gray-400 hover:text-blue-600"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-gray-400 hover:text-blue-600"
                                 onClick={() => onEdit(chore)}
                             >
                                 <Pencil className="w-4 h-4" />
@@ -50,8 +50,8 @@ export function ChoreCard({ chore, onMarkDone, onEdit, onDelete, showAssignee = 
                         {onDelete && (
                             <Button
                                 variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-gray-400 hover:text-red-600"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-gray-400 hover:text-red-600"
                                 onClick={() => onDelete(chore.id)}
                             >
                                 <Trash2 className="w-4 h-4" />

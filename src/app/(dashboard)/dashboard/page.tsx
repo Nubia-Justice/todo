@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { UserAvatar } from "@/components/features/user-avatar"
 import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
+import { ApproveChoreButton } from "@/components/features/approve-chore-button"
 
 const prisma = new PrismaClient()
 
@@ -15,6 +16,11 @@ type DashboardData = {
     }
     pendingChores: number
     completedChores: number
+    choresToApprove: {
+        id: string
+        template: { title: string; basePoints: number }
+        assignedTo: { name: string; avatar: string | null }
+    }[]
 } | {
     role: 'child'
     myChores: {
@@ -28,14 +34,16 @@ type DashboardData = {
 
 async function getData(userId: string, role: string, familyId: string): Promise<DashboardData> {
     if (role === 'parent') {
-        // Parent Data: Family overview
         const family = await prisma.family.findUnique({
             where: { id: familyId },
             include: {
-                users: true,
-                templates: true,
+                users: {
+                    select: { id: true, name: true, points: true, avatar: true }
+                }
             }
         })
+
+        if (!family) throw new Error("Family not found")
 
         const pendingChores = await prisma.choreAssignment.count({
             where: {
@@ -44,42 +52,51 @@ async function getData(userId: string, role: string, familyId: string): Promise<
             }
         })
 
-        const completedChoresCount = await prisma.choreAssignment.count({
+        const completedChores = await prisma.choreAssignment.count({
             where: {
                 template: { familyId },
-                status: "Completed" // Waiting for approval
+                status: "Completed"
             }
         })
 
-        // Fetch actual completed chores for approval list
         const choresToApprove = await prisma.choreAssignment.findMany({
             where: {
                 template: { familyId },
                 status: "Completed"
             },
             include: {
-                template: true,
-                assignedTo: true
+                template: { select: { title: true, basePoints: true } },
+                assignedTo: { select: { name: true, avatar: true } }
             }
         })
 
-        return { family, pendingChores, completedChoresCount, choresToApprove }
+        return {
+            role: 'parent',
+            family,
+            pendingChores,
+            completedChores,
+            choresToApprove
+        }
     } else {
-        // Child Data: Personal overview
         const myChores = await prisma.choreAssignment.findMany({
             where: {
                 assignedToId: userId,
-                status: { in: ["Pending", "Completed", "Approved"] } // Show approved recently too? Maybe just pending/completed for now
+                status: { in: ["Pending", "Completed", "Approved"] }
             },
-            include: { template: true },
+            include: { template: { select: { title: true, basePoints: true } } },
             orderBy: { dueDate: 'asc' }
         })
 
         const user = await prisma.user.findUnique({
-            where: { id: userId }
+            where: { id: userId },
+            select: { points: true }
         })
 
-        return { myChores, points: user?.points || 0 }
+        return {
+            role: 'child',
+            myChores,
+            points: user?.points || 0
+        }
     }
 }
 
@@ -88,10 +105,10 @@ export default async function DashboardPage() {
     if (!session?.user) return null
 
     // @ts-expect-error -- Session user type is extended at runtime
-    const { role, familyId, id } = session.user
+    const { familyId, id, role } = session.user
 
     if (!familyId) {
-        return <div className="p-4">You are not part of a family yet.</div>
+        return <div className="p-8 text-center">You are not part of a family yet.</div>
     }
 
     const data = await getData(id as string, role as string, familyId as string)
@@ -105,99 +122,101 @@ export default async function DashboardPage() {
                 <p className="text-gray-500">Here's what's happening today.</p>
             </header>
 
-            {role === 'child' ? (
-                // Child View
+            {data.role === 'child' ? (
                 <>
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl p-6 text-white shadow-lg">
-                            <div className="flex items-center gap-3 mb-2">
-                                <Star className="w-6 h-6 fill-white" />
-                                <span className="font-semibold opacity-90">My Points</span>
-                            </div>
-                            {/* @ts-ignore */}
-                            <div className="text-4xl font-bold">{data.points}</div>
-                        </div>
-                        <div className="bg-white rounded-xl p-6 shadow-sm border">
-                            <div className="flex items-center gap-3 mb-2 text-indigo-600">
-                                <CheckCircle2 className="w-6 h-6" />
-                                <span className="font-semibold">To Do</span>
-                            </div>
-                            {/* @ts-ignore */}
-                            <div className="text-4xl font-bold text-gray-900">{data.myChores.filter(c => c.status === 'Pending').length}</div>
-                        </div>
+                        <Card className="bg-gradient-to-br from-yellow-400 to-orange-500 text-white border-none">
+                            <CardContent className="p-6">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <Star className="w-6 h-6 fill-white" />
+                                    <span className="font-semibold opacity-90">My Points</span>
+                                </div>
+                                <div className="text-4xl font-bold">{data.points}</div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="p-6">
+                                <div className="flex items-center gap-3 mb-2 text-indigo-600">
+                                    <CheckCircle2 className="w-6 h-6" />
+                                    <span className="font-semibold">To Do</span>
+                                </div>
+                                <div className="text-4xl font-bold text-gray-900">
+                                    {data.myChores.filter(c => c.status === 'Pending').length}
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
 
-                    <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                        <div className="p-4 border-b bg-gray-50">
-                            <h2 className="font-semibold text-gray-900">My Chores</h2>
-                        </div>
+                    <Card>
+                        <CardHeader className="border-b bg-gray-50/50 py-4">
+                            <CardTitle className="text-base">My Chores</CardTitle>
+                        </CardHeader>
                         <div className="divide-y">
-                            {/* @ts-ignore */}
                             {data.myChores.length === 0 ? (
                                 <div className="p-8 text-center text-gray-500">No chores assigned! 🎉</div>
                             ) : (
-                                /* @ts-ignore */
                                 data.myChores.map((chore) => (
-                                    <div key={chore.id} className="p-4 flex items-center justify-between hover:bg-gray-50">
+                                    <div key={chore.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
                                         <div>
                                             <h3 className="font-medium text-gray-900">{chore.template.title}</h3>
-                                            <p className="text-sm text-gray-500">{chore.template.basePoints} pts • Due {chore.dueDate ? new Date(chore.dueDate).toLocaleDateString() : 'No date'}</p>
+                                            <p className="text-sm text-gray-500">
+                                                {chore.template.basePoints} pts • Due {chore.dueDate ? format(chore.dueDate, "MMM d") : 'No date'}
+                                            </p>
                                         </div>
-                                        <CompleteChoreButton choreId={chore.id} status={chore.status} />
+                                        <Badge variant={chore.status === 'Completed' ? 'warning' : chore.status === 'Approved' ? 'success' : 'secondary'}>
+                                            {chore.status === 'Completed' ? 'Waiting Approval' : chore.status}
+                                        </Badge>
                                     </div>
                                 ))
                             )}
                         </div>
-                    </div>
+                    </Card>
                 </>
             ) : (
-                // Parent View
                 <>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="bg-white rounded-xl p-6 shadow-sm border">
-                            <div className="flex items-center gap-3 mb-2 text-blue-600">
-                                <Clock className="w-6 h-6" />
-                                <span className="font-semibold">Pending Approval</span>
-                            </div>
-                            {/* @ts-ignore */}
-                            <div className="text-3xl font-bold text-gray-900">{data.completedChoresCount}</div>
-                        </div>
-                        <div className="bg-white rounded-xl p-6 shadow-sm border">
-                            <div className="flex items-center gap-3 mb-2 text-indigo-600">
-                                <CheckCircle2 className="w-6 h-6" />
-                                <span className="font-semibold">Assigned</span>
-                            </div>
-                            {/* @ts-ignore */}
-                            <div className="text-3xl font-bold text-gray-900">{data.pendingChores}</div>
-                        </div>
-                        <div className="bg-white rounded-xl p-6 shadow-sm border">
-                            <div className="flex items-center gap-3 mb-2 text-orange-600">
-                                <Trophy className="w-6 h-6" />
-                                <span className="font-semibold">Family Members</span>
-                            </div>
-                            {/* @ts-ignore */}
-                            <div className="text-3xl font-bold text-gray-900">{data.family.users.length}</div>
-                        </div>
+                        <Card>
+                            <CardContent className="p-6">
+                                <div className="flex items-center gap-3 mb-2 text-blue-600">
+                                    <Clock className="w-6 h-6" />
+                                    <span className="font-semibold">Pending Approval</span>
+                                </div>
+                                <div className="text-3xl font-bold text-gray-900">{data.completedChores}</div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="p-6">
+                                <div className="flex items-center gap-3 mb-2 text-indigo-600">
+                                    <CheckCircle2 className="w-6 h-6" />
+                                    <span className="font-semibold">Assigned</span>
+                                </div>
+                                <div className="text-3xl font-bold text-gray-900">{data.pendingChores}</div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="p-6">
+                                <div className="flex items-center gap-3 mb-2 text-orange-600">
+                                    <Trophy className="w-6 h-6" />
+                                    <span className="font-semibold">Family Members</span>
+                                </div>
+                                <div className="text-3xl font-bold text-gray-900">{data.family.users.length}</div>
+                            </CardContent>
+                        </Card>
                     </div>
 
-                    {/* Pending Approvals Section */}
-                    {/* @ts-ignore */}
                     {data.choresToApprove.length > 0 && (
-                        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                            <div className="p-4 border-b bg-yellow-50 flex justify-between items-center">
-                                <h2 className="font-semibold text-yellow-900 flex items-center gap-2">
+                        <Card>
+                            <CardHeader className="border-b bg-yellow-50/50 py-4">
+                                <CardTitle className="text-base flex items-center gap-2 text-yellow-900">
                                     <Clock className="w-5 h-5" />
                                     Waiting for Approval
-                                </h2>
-                            </div>
+                                </CardTitle>
+                            </CardHeader>
                             <div className="divide-y">
-                                {/* @ts-ignore */}
                                 {data.choresToApprove.map((chore) => (
-                                    <div key={chore.id} className="p-4 flex items-center justify-between hover:bg-gray-50">
+                                    <div key={chore.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs">
-                                                {chore.assignedTo.name[0]}
-                                            </div>
+                                            <UserAvatar name={chore.assignedTo.name} image={chore.assignedTo.avatar} size="sm" />
                                             <div>
                                                 <h3 className="font-medium text-gray-900">{chore.template.title}</h3>
                                                 <p className="text-sm text-gray-500">
@@ -211,20 +230,17 @@ export default async function DashboardPage() {
                                     </div>
                                 ))}
                             </div>
-                        </div>
+                        </Card>
                     )}
 
-                    <div className="bg-white rounded-xl shadow-sm border">
-                        <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
-                            <h2 className="font-semibold text-gray-900">Family Members</h2>
-                        </div>
+                    <Card>
+                        <CardHeader className="border-b bg-gray-50/50 py-4">
+                            <CardTitle className="text-base">Family Members</CardTitle>
+                        </CardHeader>
                         <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {/* @ts-expect-error -- Data structure includes users */}
                             {data.family.users.map(user => (
-                                <div key={user.id} className="flex items-center gap-4 p-3 border rounded-lg">
-                                    <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
-                                        {user.name[0]}
-                                    </div>
+                                <div key={user.id} className="flex items-center gap-4 p-3 border rounded-lg hover:bg-gray-50 transition-colors">
+                                    <UserAvatar name={user.name} image={user.avatar} />
                                     <div>
                                         <div className="font-medium">{user.name}</div>
                                         <div className="text-sm text-gray-500">{user.points} points</div>
@@ -232,7 +248,7 @@ export default async function DashboardPage() {
                                 </div>
                             ))}
                         </div>
-                    </div>
+                    </Card>
                 </>
             )}
         </div>

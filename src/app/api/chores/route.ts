@@ -14,12 +14,18 @@ const createChoreSchema = z.object({
     dueDate: z.string().optional(), // ISO string
 })
 
+interface UserWithRole {
+    id: string
+    role: string
+    familyId: string
+}
+
 export async function GET() {
     const session = await auth()
     if (!session?.user) return new NextResponse("Unauthorized", { status: 401 })
 
-    // @ts-expect-error -- Session user type is extended at runtime
-    const { role, familyId, id: userId } = session.user
+    // Session user type is extended at runtime
+    const { role, familyId, id: userId } = session.user as unknown as UserWithRole
 
     if (!familyId) return new NextResponse("No family found", { status: 400 })
 
@@ -51,8 +57,8 @@ export async function POST(req: Request) {
     const session = await auth()
     if (!session?.user) return new NextResponse("Unauthorized", { status: 401 })
 
-    // @ts-expect-error -- Session user type is extended at runtime
-    const { role, familyId } = session.user
+    // Session user type is extended at runtime
+    const { role, familyId } = session.user as unknown as UserWithRole
 
     if (role !== 'parent') {
         return new NextResponse("Only parents can assign chores", { status: 403 })

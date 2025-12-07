@@ -8,8 +8,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const session = await auth()
     if (!session?.user) return new NextResponse("Unauthorized", { status: 401 })
 
-    // @ts-expect-error -- Session user type is extended at runtime
-    const { role, id: userId } = session.user
+    // Session user type is extended at runtime
+    const { role, id: userId } = session.user as any
 
     if (role !== 'parent') {
         return new NextResponse("Only parents can approve chores", { status: 403 })

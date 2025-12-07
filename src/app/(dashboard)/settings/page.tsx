@@ -45,7 +45,7 @@ export default async function SettingsPage() {
                 </p>
                 <div className="p-4 bg-gray-50 rounded-md border">
                     <div className="text-sm font-medium text-gray-700">Family Invite Code</div>
-                    {/* @ts-expect-error -- Family ID is available */}
+
                     <p className="text-3xl font-mono font-bold tracking-wider text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg inline-block border-2 border-indigo-100 border-dashed">
                         {familyId}
                     </p>
